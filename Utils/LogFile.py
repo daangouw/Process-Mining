@@ -59,12 +59,12 @@ class LogFile:
     def int_convert(self):
 
         
-        targets = self.data['event concept:name'].unique()
+        targets = self.data[self.activity].unique()
         map_to_int = {name: n+1 for n, name in enumerate(targets)}
         int_to_map = {n+1: name for n, name in enumerate(targets)}
     
 
-        self.data['event concept:name'] = self.data['event concept:name'].replace(map_to_int)
+        self.data[self.activity] = self.data[self.activity].replace(map_to_int)
 
         return int_to_map
 
@@ -371,7 +371,7 @@ class LogFile:
         train_logfile = LogFile(None, None, None, None, self.time, self.trace, self.activity, self.values, False, False)
         train_logfile.filename = self.filename
         train_logfile.values = self.values
-        train_logfile.contextdata = train
+        train_logfile.contextdata = train_data
         train_logfile.categoricalAttributes = self.categoricalAttributes
         train_logfile.numericalAttributes = self.numericalAttributes
         train_logfile.data = train_data
@@ -380,7 +380,7 @@ class LogFile:
         test_logfile = LogFile(None, None, None, None, self.time, self.trace, self.activity, self.values, False, False)
         test_logfile.filename = self.filename
         test_logfile.values = self.values
-        test_logfile.contextdata = test
+        test_logfile.contextdata = test_data
         test_logfile.categoricalAttributes = self.categoricalAttributes
         test_logfile.numericalAttributes = self.numericalAttributes
         test_logfile.data = test_data
