@@ -344,43 +344,49 @@ class LogFile:
         data[self.time] = pd.to_datetime(data[self.time])
 
 
-        
+        best_split = None
         loss = len(self.data)
         
         for i in split_interval:
-            train, test = train_test_split(data[self.trace].unique(), test_size=(100-i)/100, shuffle=False)
-            train_data = data[data[self.trace].isin(train)]
-            test_data = data[data[self.trace].isin(test)]
+            train, test = train_test_split(self.data[self.trace].unique(), test_size=(100-i)/100, shuffle=False)
+            train_data = self.data[self.data[self.trace].isin(train)]
+            test_data = self.data[self.data[self.trace].isin(test)]
+
             
             overlap = train_data[train_data[self.time] > test_data[self.time].min()][[self.trace]]
             
             if len(overlap) < loss:
+                best_split = i
+
                 loss = len(overlap)
                 best_train = train_data[~train_data[self.trace].isin(overlap[self.trace].tolist())]
                 best_test = test_data
+
         
         
-            print('Train data lost due to overlap: ' + str(len(overlap)/len(train_data)))
+        print('Train data lost due to overlap: ' + str(len(overlap)/len(train_data)) + "/n Best Split: " + str(best_split) )
+        train_data = self.data[self.data[self.trace].isin(best_train[self.trace].unique())]
+        test_data = self.data[self.data[self.trace].isin(best_test[self.trace].unique())]
 
-            train_logfile = LogFile(None, None, None, None, self.time, self.trace, self.activity, self.values, False, False)
-            train_logfile.filename = self.filename
-            train_logfile.values = self.values
-            train_logfile.contextdata = train
-            train_logfile.categoricalAttributes = self.categoricalAttributes
-            train_logfile.numericalAttributes = self.numericalAttributes
-            train_logfile.data = best_train
-            train_logfile.k = self.k
+        train_logfile = LogFile(None, None, None, None, self.time, self.trace, self.activity, self.values, False, False)
+        train_logfile.filename = self.filename
+        train_logfile.values = self.values
+        train_logfile.contextdata = train
+        train_logfile.categoricalAttributes = self.categoricalAttributes
+        train_logfile.numericalAttributes = self.numericalAttributes
+        train_logfile.data = train_data
+        train_logfile.k = self.k
 
-            test_logfile = LogFile(None, None, None, None, self.time, self.trace, self.activity, self.values, False, False)
-            test_logfile.filename = self.filename
-            test_logfile.values = self.values
-            test_logfile.contextdata = test
-            test_logfile.categoricalAttributes = self.categoricalAttributes
-            test_logfile.numericalAttributes = self.numericalAttributes
-            test_logfile.data = best_test
-            test_logfile.k = self.k
+        test_logfile = LogFile(None, None, None, None, self.time, self.trace, self.activity, self.values, False, False)
+        test_logfile.filename = self.filename
+        test_logfile.values = self.values
+        test_logfile.contextdata = test
+        test_logfile.categoricalAttributes = self.categoricalAttributes
+        test_logfile.numericalAttributes = self.numericalAttributes
+        test_logfile.data = test_data
+        test_logfile.k = self.k
 
-            return train_logfile, test_logfile
+        return train_logfile, test_logfile
 
     def splitTrainTest(self, train_percentage, split_case=True, method="train-test"):
         import random
