@@ -337,6 +337,51 @@ class LogFile:
         new_data.append(record)
         return new_data
 
+
+    def split_train_test(self, split_interval):
+        from sklearn.model_selection import train_test_split
+        data = self.data[(self.data[self.activity] == 'A_SUBMITTED-COMPLETE') | (self.data[self.activity] == 'End-End')]
+        data[self.time] = pd.to_datetime(data[self.time])
+
+
+        
+        loss = len(self.data)
+        
+        for i in split_interval:
+            train, test = train_test_split(data[self.trace].unique(), test_size=(100-i)/100, shuffle=False)
+            train_data = data[data[self.trace].isin(train)]
+            test_data = data[data[self.trace].isin(test)]
+            
+            overlap = train_data[train_data[self.time] > test_data[self.time].min()][[self.trace]]
+            
+            if len(overlap) < loss:
+                loss = len(overlap)
+                best_train = train_data[~train_data[self.trace].isin(overlap[self.trace].tolist())]
+                best_test = test_data
+        
+        
+            print('Train data lost due to overlap: ' + str(len(overlap)/len(train_data)))
+
+            train_logfile = LogFile(None, None, None, None, self.time, self.trace, self.activity, self.values, False, False)
+            train_logfile.filename = self.filename
+            train_logfile.values = self.values
+            train_logfile.contextdata = train
+            train_logfile.categoricalAttributes = self.categoricalAttributes
+            train_logfile.numericalAttributes = self.numericalAttributes
+            train_logfile.data = best_train
+            train_logfile.k = self.k
+
+            test_logfile = LogFile(None, None, None, None, self.time, self.trace, self.activity, self.values, False, False)
+            test_logfile.filename = self.filename
+            test_logfile.values = self.values
+            test_logfile.contextdata = test
+            test_logfile.categoricalAttributes = self.categoricalAttributes
+            test_logfile.numericalAttributes = self.numericalAttributes
+            test_logfile.data = best_test
+            test_logfile.k = self.k
+
+            return train_logfile, test_logfile
+
     def splitTrainTest(self, train_percentage, split_case=True, method="train-test"):
         import random
         train_percentage = train_percentage / 100.0
