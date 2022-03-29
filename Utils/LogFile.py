@@ -13,11 +13,12 @@ import math
 
 class LogFile:
 
-    def __init__(self, filename, delim, header, rows, time_attr, trace_attr, activity_attr = None, values = None, integer_input = False, convert = True, k = 1, dtype=None):
+    def __init__(self, filename, delim, header, rows, time_attr, trace_attr, activity_attr = None, time_format = None, values = None, integer_input = False, convert = True, k = 1, dtype=None):
         self.filename = filename
         self.time = time_attr
         self.trace = trace_attr
         self.activity = activity_attr
+        self.time_format = time_format
         if values is not None:
             self.values = values
         else:
@@ -68,11 +69,34 @@ class LogFile:
 
         return int_to_map
 
+    def create_subset(self, percentage):
+        cases = self.data[self.trace].unique()
+        amount_cases_subset = round(len(cases) * (percentage / 100))
+        subset_data = self.data[self.data[self.trace].isin(cases[:amount_cases_subset])]
+        
+        sub_logfile = LogFile(None, None, None, None, self.time, self.trace, self.activity, self.values, False, False)
+        sub_logfile.filename = self.filename
+        sub_logfile.values = self.values
+        sub_logfile.contextdata = None
+        sub_logfile.categoricalAttributes = self.categoricalAttributes
+        sub_logfile.numericalAttributes = self.numericalAttributes
+        sub_logfile.data = subset_data
+        sub_logfile.k = self.k
+
+        return sub_logfile
 
 
+    def delete_end_activity(self):
+        self.data = self.data[self.data[self.activity] != 'End']
 
     def get_cases(self):
         return self.get_data().groupby([self.trace])
+    
+    def set_k_longest_trace(self):
+        cases = self.data.groupby([self.trace])
+        for case in cases:
+            if len(case[1]) > self.k:
+                self.k = len(case[1])
     
     def filter_case_length(self, min_length):
         cases = self.data.groupby([self.trace])
@@ -95,6 +119,17 @@ class LogFile:
         """
         self.data = self.data.apply(lambda x: self.convert_column2ints(x))
         self.data.to_csv(file_out, index=False)
+    
+    def add_start_date(self):
+
+        unique_cases = self.data[self.trace].unique()
+        mapper_dict = {}
+        for i in unique_cases:
+            df_case = self.data[self.data[self.trace] == i]
+            start_time = df_case.iloc[0][self.time]
+            mapper_dict[i] = start_time
+
+        self.data['Start Date'] = self.data[self.trace].map(mapper_dict)
 
     def convert_column2ints(self, x):
 
@@ -247,7 +282,7 @@ class LogFile:
         shift_data = trace_data.shift().fillna(0)
         shift_data.at[shift_data.first_valid_index(), self.trace] = trace[0]
         joined_trace = shift_data.join(trace_data, lsuffix="_Prev0")
-        for i in range(1, self.k):
+        for i in range(1, self.k + 1):
             shift_data = shift_data.shift().fillna(0)
             shift_data.at[shift_data.first_valid_index(), self.trace] = trace[0]
             joined_trace = shift_data.join(joined_trace, lsuffix="_Prev%i" % i)
@@ -333,14 +368,28 @@ class LogFile:
             elif col == self.time:
                 record[col] = new_data[-1][self.time]
             else:
-                record[col] = "end"
+                record[col] = "End"
         new_data.append(record)
         return new_data
+    
+    def create_split_df(self):
+        split_data = self.data[(self.data[self.activity] == self.data[self.activity].iloc[0]) | (self.data[self.activity] == 'End')]
+        split_data[self.time] = pd.to_datetime(split_data[self.time])
+
+        split_logfile = LogFile(None, None, None, None, self.time, self.trace, self.activity, self.values, False, False)
+        split_logfile.filename = self.filename
+        split_logfile.values = self.values
+        split_logfile.contextdata = split_data
+        split_logfile.categoricalAttributes = self.categoricalAttributes
+        split_logfile.numericalAttributes = self.numericalAttributes
+        split_logfile.data = split_data
+        split_logfile.k = self.k
+        return split_logfile
 
 
-    def split_train_test(self, split_interval):
+    def split_train_test(self, split_interval, type):
         from sklearn.model_selection import train_test_split
-        data = self.data[(self.data[self.activity] == 'A_SUBMITTED-COMPLETE') | (self.data[self.activity] == 'End-End')]
+        data = self.data[(self.data[self.activity] == self.data[self.activity].iloc[0]) | (self.data[self.activity] == 'End')]
         data[self.time] = pd.to_datetime(data[self.time])
 
 
@@ -348,9 +397,14 @@ class LogFile:
         loss = len(self.data)
         
         for i in split_interval:
-            train, test = train_test_split(self.data[self.trace].unique(), test_size=(100-i)/100, shuffle=False)
-            train_data = self.data[self.data[self.trace].isin(train)]
-            test_data = self.data[self.data[self.trace].isin(test)]
+            if type == 'lstm':
+                train, test = train_test_split(self.contextdata[self.trace].unique(), test_size=(100-i)/100, shuffle=False)
+                train_data = self.contextdata[self.contextdata[self.trace].isin(train)]
+                test_data = self.contextdata[self.contextdata[self.trace].isin(test)]
+            else:
+                train, test = train_test_split(self.data[self.trace].unique(), test_size=(100-i)/100, shuffle=False)
+                train_data = self.data[self.data[self.trace].isin(train)]
+                test_data = self.data[self.data[self.trace].isin(test)]
 
             
             overlap = train_data[train_data[self.time] > test_data[self.time].min()][[self.trace]]
@@ -367,6 +421,7 @@ class LogFile:
         print('Train data lost due to overlap: ' + str(len(overlap)/len(train_data)) + "/n Best Split: " + str(best_split) )
         train_data = self.data[self.data[self.trace].isin(best_train[self.trace].unique())]
         test_data = self.data[self.data[self.trace].isin(best_test[self.trace].unique())]
+    
 
         train_logfile = LogFile(None, None, None, None, self.time, self.trace, self.activity, self.values, False, False)
         train_logfile.filename = self.filename
