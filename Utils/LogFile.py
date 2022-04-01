@@ -74,9 +74,10 @@ class LogFile:
         amount_cases_subset = round(len(cases) * (percentage / 100))
         subset_data = self.data[self.data[self.trace].isin(cases[:amount_cases_subset])]
         
-        sub_logfile = LogFile(None, None, None, None, self.time, self.trace, self.activity, self.values, False, False)
+        sub_logfile = LogFile(None, None, None, None, self.time, self.trace, self.activity, self.time_format, self.values, False, False)
         sub_logfile.filename = self.filename
         sub_logfile.values = self.values
+        sub_logfile.time_format = self.time_format
         sub_logfile.contextdata = None
         sub_logfile.categoricalAttributes = self.categoricalAttributes
         sub_logfile.numericalAttributes = self.numericalAttributes
@@ -376,9 +377,10 @@ class LogFile:
         split_data = self.data[(self.data[self.activity] == self.data[self.activity].iloc[0]) | (self.data[self.activity] == 'End')]
         split_data[self.time] = pd.to_datetime(split_data[self.time])
 
-        split_logfile = LogFile(None, None, None, None, self.time, self.trace, self.activity, self.values, False, False)
+        split_logfile = LogFile(None, None, None, None, self.time, self.trace, self.activity, self.time_format, self.values, False, False)
         split_logfile.filename = self.filename
         split_logfile.values = self.values
+        split_logfile.time_format = self.time_format
         split_logfile.contextdata = split_data
         split_logfile.categoricalAttributes = self.categoricalAttributes
         split_logfile.numericalAttributes = self.numericalAttributes
@@ -419,23 +421,28 @@ class LogFile:
         
         
         print('Train data lost due to overlap: ' + str(len(overlap)/len(train_data)) + "/n Best Split: " + str(best_split) )
+        train_data_context = self.contextdata[self.contextdata[self.trace].isin(best_train[self.trace].unique())]
+        test_data_context = self.contextdata[self.contextdata[self.trace].isin(best_test[self.trace].unique())]
+
         train_data = self.data[self.data[self.trace].isin(best_train[self.trace].unique())]
         test_data = self.data[self.data[self.trace].isin(best_test[self.trace].unique())]
     
 
-        train_logfile = LogFile(None, None, None, None, self.time, self.trace, self.activity, self.values, False, False)
+        train_logfile = LogFile(None, None, None, None, self.time, self.trace, self.activity, self.time_format, self.values, False, False)
         train_logfile.filename = self.filename
         train_logfile.values = self.values
-        train_logfile.contextdata = train_data
+        train_logfile.time_format = self.time_format
+        train_logfile.contextdata = train_data_context
         train_logfile.categoricalAttributes = self.categoricalAttributes
         train_logfile.numericalAttributes = self.numericalAttributes
         train_logfile.data = train_data
         train_logfile.k = self.k
 
-        test_logfile = LogFile(None, None, None, None, self.time, self.trace, self.activity, self.values, False, False)
+        test_logfile = LogFile(None, None, None, None, self.time, self.trace, self.activity, self.time_format, self.values,  False, False)
         test_logfile.filename = self.filename
         test_logfile.values = self.values
-        test_logfile.contextdata = test_data
+        test_logfile.time_format = self.time_format
+        test_logfile.contextdata = test_data_context
         test_logfile.categoricalAttributes = self.categoricalAttributes
         test_logfile.numericalAttributes = self.numericalAttributes
         test_logfile.data = test_data
